@@ -1,13 +1,32 @@
 from flask import Flask, render_template, jsonify
 import pandas as pd
 import html
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.preprocessing import StandardScaler
+from sentence_transformers import SentenceTransformer
+from sklearn.decomposition import PCA
 
 file_path = 'data/20231126.xlsx'
 df = pd.read_excel(file_path)
 df = df[df['Current Price'] >= 0]
 df['Sector'] = df['Sector'].str.replace('/', ',')
-df.drop(['Strengths', 'Limitations', "Today's High", "Today's Low"], axis=1, inplace=True)
+df.drop([
+    'Strengths', 'Limitations', "Today's High", "Today's Low",
+    "Ownership Rating", "Financial Rating", "Efficiency Rating",
+    "Valuation Rating"
+], axis=1, inplace=True)
+
 df.rename(columns={'Overall Rating': 'Analysts Rating'}, inplace=True)
+word_embedding_model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
+ndim = 2
+pca_sector = PCA(n_components=ndim)
+embeddings = word_embedding_model.encode(df['Sector'].tolist(), convert_to_tensor=True)
+embeddings_ndim = pca_sector.fit_transform(embeddings)
+sector_embedding_columns = (lambda x: [f'SectorDim{x + 1}' for x in range(ndim)])(0)
+ratio_columns = ['Piotroski', 'PE Ratio', 'PB Ratio', 'Debt to Equity']
+
+df[sector_embedding_columns] = embeddings_ndim
 
 app = Flask(__name__)
 
@@ -20,6 +39,40 @@ def format_text_box(row, column_name):
 @app.route('/')
 def index():
     return render_template('index.html')
+
+
+@app.route('/recommendation')
+def stock_recommendation_selector():
+    return render_template('stock_recommendation.html',
+                           table=df.to_html(
+                               classes='table table-striped', index=False, escape=False, table_id='dataTable'),
+                           )
+
+
+@app.route('/recommendation/<string:stock_name>', methods=['GET'])
+def stock_recommendation(stock_name):
+    stock_name_unescape = html.unescape(stock_name)
+    target_stock = df[df['NSE_CODE'] == stock_name_unescape].drop(['NSE_CODE'], axis=1)
+
+    similarity_columns = ratio_columns + sector_embedding_columns
+
+    scaler = StandardScaler()
+    df_normalized = scaler.fit_transform(df[similarity_columns])
+    target_stock_normalized = scaler.transform(target_stock[similarity_columns])
+    similarity_scores = cosine_similarity(target_stock_normalized, df_normalized)
+    similar_stock_indices = np.argsort(similarity_scores[0])[:-101:-1]
+    similar_stocks = df.iloc[similar_stock_indices]
+    similar_stocks['Similarity Percentage %'] = (
+        pow(similarity_scores[0][similar_stock_indices], 2.5) * 100
+    ).round(2)
+    similar_stocks = similar_stocks.sort_values(by='Similarity Percentage', ascending=False)
+    similar_stocks = pd.concat(
+        [similar_stocks['NSE_CODE'], similar_stocks['Similarity Percentage'], similar_stocks.iloc[:, 1:-1]], axis=1)
+
+    return render_template('single_stock_recommendation.html',
+                           table=similar_stocks.to_html(classes='table table-striped', index=False, escape=False,
+                                                        table_id='dataTable'),
+                           stock_name=stock_name_unescape)
 
 
 @app.route('/sector')
@@ -65,7 +118,8 @@ def sector():
 
     return render_template('sector.html',
                            table=result_df[['Sector', 'Price Change %', 'Market Cap in Crores', 'Number of Stocks',
-                                            'ROE', 'PE Ratio', 'Piotroski', 'Debt to Equity', 'PB Ratio', 'Analysts Rating']].to_html(
+                                            'ROE', 'PE Ratio', 'Piotroski', 'Debt to Equity', 'PB Ratio',
+                                            'Analysts Rating']].to_html(
                                classes='table table-striped', index=False, escape=False, table_id='dataTable'))
 
 
@@ -73,9 +127,7 @@ def sector():
 def selected_sector(sector_name):
     sector_name_unescape = html.unescape(sector_name)
     selected_sector_df = df[df['Sector'] == sector_name_unescape]
-    selected_sector_df.drop(columns=[
-        'Sector', 'Ownership Rating', 'Financial Rating', 'Efficiency Rating', 'Valuation Rating'
-    ], axis=1, inplace=True)
+    selected_sector_df.drop(columns=['Sector'], axis=1, inplace=True)
 
     selected_sector_df['SS Rating 1'] = round((selected_sector_df['Analysts Rating'] / 5) +
                                               (selected_sector_df['Piotroski'] / 9) * 2.5, 2)

@@ -10,7 +10,10 @@
 </head>
 <body>
     <h1>Welcome to Stock Star</h1>
+    <br><br>
     <h3 id="sectorPage">Click me to go to sectors</h3>
+    <br><br>
+    <h3 id="recommendationPage">Click me to go to stock recommendation</h3>
 
     <div id="selectedSectorData" class="container mt-3">
         {{ selectedSectorData | safe }}
@@ -26,6 +29,9 @@
             // Add a click event listener to the table rows
             $('#sectorPage').on('click', function() {
                 window.location.href = "/sector";
+            });
+            $('#recommendationPage').on('click', function() {
+                window.location.href = "/recommendation";
             });
         });
 

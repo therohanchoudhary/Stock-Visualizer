@@ -4,30 +4,22 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.css" />
-    <style>
-        th, td {
-            text-align: left !important;
-            vertical-align: middle !important;
-        }
-    </style>
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.css">
+
     <title>Stock Star</title>
 </head>
 <body>
-    <div class="container mt-5">
-        <h1>Average Metrics by Sector</h1>
-        <div id="dataTableContainer">
-            {{ table | safe }}
-        </div>
-    </div>
 
-    <div id="selectedSectorData" class="container mt-3">
-        {{ selectedSectorData | safe }}
+    <div class="container mt-5">
+        <h1>Click on a stock to get recommendation</h1>
+        <table id="dataTableContainer" class="display">
+            {{ table | safe }}
+        </table>
     </div>
 
     <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.js"></script>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
 
     <script>
         $(document).ready(function() {
@@ -35,10 +27,9 @@
 
             $('#dataTable tbody').on('click', 'tr', function() {
                 var data = table.row(this).data();
-                window.location.href = "/selected_sector/" + encodeURIComponent(data[0]);
+                window.location.href = "/recommendation/" + encodeURIComponent(data[0]);
             });
         });
-
     </script>
 </body>
 </html>

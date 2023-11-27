@@ -5,7 +5,6 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.css" />
     <style>
         th, td {
             text-align: left !important;
@@ -16,14 +15,10 @@
 </head>
 <body>
     <div class="container mt-5">
-        <h1>Average Metrics by Sector</h1>
-        <div id="dataTableContainer">
+        <h1>Selected Stock: <span style="color: #FE846A">{{ stock_name }}</span></h1>
+        <div id="selectedSectorDetails">
             {{ table | safe }}
         </div>
-    </div>
-
-    <div id="selectedSectorData" class="container mt-3">
-        {{ selectedSectorData | safe }}
     </div>
 
     <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
@@ -31,14 +26,13 @@
 
     <script>
         $(document).ready(function() {
-            var table = $('#dataTable').DataTable();
-
-            $('#dataTable tbody').on('click', 'tr', function() {
-                var data = table.row(this).data();
-                window.location.href = "/selected_sector/" + encodeURIComponent(data[0]);
+            // You can initialize DataTables here if needed
+            var table = $('#dataTable').DataTable({
+                "order": [[1, 'desc']],
+                "pageLength": 100,
             });
+            console.log(table)
         });
-
     </script>
 </body>
 </html>
