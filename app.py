@@ -7,7 +7,7 @@ from sklearn.preprocessing import StandardScaler
 from sentence_transformers import SentenceTransformer
 from sklearn.decomposition import PCA
 
-file_path = 'data/20231126.xlsx'
+file_path = 'data/20231201.xlsx'
 df = pd.read_excel(file_path)
 df = df[df['Current Price'] >= 0]
 df['Sector'] = df['Sector'].str.replace('/', ',')
@@ -27,6 +27,8 @@ sector_embedding_columns = (lambda x: [f'SectorDim{x + 1}' for x in range(ndim)]
 ratio_columns = ['Piotroski', 'PE Ratio', 'PB Ratio', 'Debt to Equity']
 
 df[sector_embedding_columns] = embeddings_ndim
+
+df['SS rating 1'] = ((df['Analysts Rating'] / 5) + (df['Piotroski'] / 9)) * 2.5
 
 app = Flask(__name__)
 
@@ -87,6 +89,7 @@ def sector():
     average_de = df.groupby('Sector')['Debt to Equity'].mean().reset_index()
     average_pb = df.groupby('Sector')['PB Ratio'].mean().reset_index()
     average_analysts_rating = df.groupby('Sector')['Analysts Rating'].mean().reset_index()
+    average_ss_rating_1 = df.groupby('Sector')['SS rating 1'].mean().reset_index()
 
     average_price_changes['Price Change %'] = average_price_changes['Price Change %'].round(2)
     average_market_cap['Market Cap in Crores'] = average_market_cap['Market Cap'].round(2)
@@ -97,6 +100,7 @@ def sector():
     average_de['Debt to Equity'] = average_de['Debt to Equity'].round(2)
     average_pb['PB Ratio'] = average_pb['PB Ratio'].round(2)
     average_analysts_rating['Analysts Rating'] = average_analysts_rating['Analysts Rating'].round(2)
+    average_ss_rating_1['SS rating 1'] = average_ss_rating_1['SS rating 1'].round(2)
 
     dataframes_to_merge = [
         average_price_changes,
@@ -107,7 +111,8 @@ def sector():
         average_piotroski,
         average_de,
         average_pb,
-        average_analysts_rating
+        average_analysts_rating,
+        average_ss_rating_1,
     ]
 
     result_df = dataframes_to_merge[0]
@@ -119,7 +124,7 @@ def sector():
     return render_template('sector.html',
                            table=result_df[['Sector', 'Price Change %', 'Market Cap in Crores', 'Number of Stocks',
                                             'ROE', 'PE Ratio', 'Piotroski', 'Debt to Equity', 'PB Ratio',
-                                            'Analysts Rating']].to_html(
+                                            'Analysts Rating', 'SS rating 1']].to_html(
                                classes='table table-striped', index=False, escape=False, table_id='dataTable'))
 
 
@@ -128,9 +133,6 @@ def selected_sector(sector_name):
     sector_name_unescape = html.unescape(sector_name)
     selected_sector_df = df[df['Sector'] == sector_name_unescape]
     selected_sector_df.drop(columns=['Sector'], axis=1, inplace=True)
-
-    selected_sector_df['SS Rating 1'] = round((selected_sector_df['Analysts Rating'] / 5) +
-                                              (selected_sector_df['Piotroski'] / 9) * 2.5, 2)
 
     selected_sector_df['Analysts Rating'] = selected_sector_df['Analysts Rating'].astype(float)
     selected_sector_df['Price Change %'] = selected_sector_df.apply(lambda row: format_text_box(row, 'Price Change %'),
