@@ -1,13 +1,17 @@
-from flask import Flask, render_template, jsonify
-import pandas as pd
 import html
+
+import matplotlib
 import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.preprocessing import StandardScaler
+import pandas as pd
+from flask import Flask, render_template
 from sentence_transformers import SentenceTransformer
 from sklearn.decomposition import PCA
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.preprocessing import StandardScaler
 
-file_path = 'data/20231201.xlsx'
+matplotlib.use("TkAgg")
+
+file_path = 'data/20231220.xlsx'
 df = pd.read_excel(file_path)
 df = df[df['Current Price'] >= 0]
 df['Sector'] = df['Sector'].str.replace('/', ',')
@@ -64,12 +68,13 @@ def stock_recommendation(stock_name):
     similarity_scores = cosine_similarity(target_stock_normalized, df_normalized)
     similar_stock_indices = np.argsort(similarity_scores[0])[:-101:-1]
     similar_stocks = df.iloc[similar_stock_indices]
-    similar_stocks['Similarity Percentage %'] = (
-        pow(similarity_scores[0][similar_stock_indices], 2.5) * 100
+    similar_stocks['Similarity Percentage'] = (
+            (similarity_scores[0][similar_stock_indices] ** 2.5) * 100
     ).round(2)
     similar_stocks = similar_stocks.sort_values(by='Similarity Percentage', ascending=False)
     similar_stocks = pd.concat(
         [similar_stocks['NSE_CODE'], similar_stocks['Similarity Percentage'], similar_stocks.iloc[:, 1:-1]], axis=1)
+
 
     return render_template('single_stock_recommendation.html',
                            table=similar_stocks.to_html(classes='table table-striped', index=False, escape=False,

@@ -19,6 +19,10 @@
         <div id="selectedSectorDetails">
             {{ table | safe }}
         </div>
+
+        <img src="{{ plot_path }}" alt="Stock Plot" class="img-fluid mt-4">
+
+        <img src='data:image/png;base64,{{ plot | safe }}' alt="Stock Plot" class="img-fluid mt-4">
     </div>
 
     <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
