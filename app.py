@@ -36,10 +36,36 @@ df['SS rating 1'] = ((df['Analysts Rating'] / 5) + (df['Piotroski'] / 9)) * 2.5
 
 app = Flask(__name__)
 
+threshold_ratios = {
+    'pe': [10, 40],  # since lower pe value indicates better pe ratio
+    'pb': [3, 10],  # same reason as pe
+    'de': [0.5, 3], # same reason as pe
+    'roe': [40, 0],
+    'ss_rating_1': [3.5, 1],
+    'piotroski': [7, 3],
+}
 
-def format_text_box(row, column_name):
-    text_style = f"""background-color: {'green' if row[column_name] >= 0 else 'red'}; color: white; padding: 3px"""
+
+def format_text_box(row, column_name, threshold=0):
+    text_style = f"""background-color: {'green' if row[column_name] >= threshold else 'red'}; color: white; padding: 3px"""
     return f'<span style="{text_style}">{row[column_name]}</span>'
+
+
+def format_ratio_box(row, column_name, limits, inverse=False):
+    value = row[column_name]
+    text_style = f"""padding: 3px; background-color: """
+    red_bg = text_style + "red; color: white"
+    green_bg = text_style + "green; color: white"
+    yellow_bg = text_style + "yellow; color: black"
+
+    if value < 0 or (inverse and value > limits[1]) or (not inverse and value < limits[1]):
+        final_style = red_bg
+    elif (inverse and value < limits[0]) or (not inverse and value >= limits[0]):
+        final_style = green_bg
+    else:
+        final_style = yellow_bg
+
+    return f'<span style="{final_style}">{row[column_name]}</span>'
 
 
 @app.route('/')
@@ -74,7 +100,6 @@ def stock_recommendation(stock_name):
     similar_stocks = similar_stocks.sort_values(by='Similarity Percentage', ascending=False)
     similar_stocks = pd.concat(
         [similar_stocks['NSE_CODE'], similar_stocks['Similarity Percentage'], similar_stocks.iloc[:, 1:-1]], axis=1)
-
 
     return render_template('single_stock_recommendation.html',
                            table=similar_stocks.to_html(classes='table table-striped', index=False, escape=False,
@@ -137,14 +162,43 @@ def sector():
 def selected_sector(sector_name):
     sector_name_unescape = html.unescape(sector_name)
     selected_sector_df = df[df['Sector'] == sector_name_unescape]
-    selected_sector_df.drop(columns=['Sector'], axis=1, inplace=True)
+    selected_sector_df = selected_sector_df.drop(columns=['Sector'], axis=1)
 
-    selected_sector_df['Analysts Rating'] = selected_sector_df['Analysts Rating'].astype(float)
-    selected_sector_df['Price Change %'] = selected_sector_df.apply(lambda row: format_text_box(row, 'Price Change %'),
-                                                                    axis=1)
-    selected_sector_df['Analysts Rating'] = selected_sector_df.apply(
+    selected_sector_df['Analysts Rating'] = selected_sector_df['Analysts Rating'].astype(float).copy()
+
+    selected_sector_df.loc[:, 'Analysts Rating'] = selected_sector_df.apply(
         lambda row: format_text_box(row, 'Analysts Rating'), axis=1)
 
+    selected_sector_df['SS rating 1'] = selected_sector_df['SS rating 1'].astype(float).round(2).copy()
+    selected_sector_df.loc[:, 'SS rating 1'] = selected_sector_df.apply(
+        lambda row: format_ratio_box(row, 'SS rating 1', threshold_ratios['ss_rating_1']),
+        axis=1)
+
+    selected_sector_df['Debt to Equity'] = selected_sector_df['Debt to Equity'].astype(float).round(2).copy()
+    selected_sector_df.loc[:, 'Debt to Equity'] = selected_sector_df.apply(
+        lambda row: format_ratio_box(row, 'Debt to Equity', threshold_ratios['de'], inverse=True),
+        axis=1)
+
+    selected_sector_df.loc[:, 'Price Change %'] = selected_sector_df.apply(lambda row: format_text_box(row, 'Price Change %'),
+                                                                    axis=1)
+
+    selected_sector_df.loc[:, 'Piotroski'] = selected_sector_df.apply(
+        lambda row: format_ratio_box(row, 'Piotroski', threshold_ratios['piotroski']),
+        axis=1)
+
+    selected_sector_df.loc[:, 'PE Ratio'] = selected_sector_df.apply(
+        lambda row: format_ratio_box(row, 'PE Ratio', threshold_ratios['pe'], inverse=True),
+        axis=1)
+
+    selected_sector_df.loc[:, 'PB Ratio'] = selected_sector_df.apply(
+        lambda row: format_ratio_box(row, 'PB Ratio', threshold_ratios['pb'], inverse=True),
+        axis=1)
+
+    selected_sector_df.loc[:, 'ROE'] = selected_sector_df.apply(
+        lambda row: format_ratio_box(row, 'ROE', threshold_ratios['roe']),
+        axis=1)
+
+    selected_sector_df.drop(columns=sector_embedding_columns + ['EPS Ratio'], inplace=True)
     return render_template('selected_sector.html',
                            table=selected_sector_df.to_html(
                                classes='table table-striped', index=False, escape=False, table_id='dataTable'),
@@ -152,3 +206,5 @@ def selected_sector(sector_name):
                            )
 
 
+if __name__ == '__main__':
+    app.run(port=8000, debug=True)
