@@ -11,7 +11,7 @@ from sklearn.preprocessing import StandardScaler
 
 matplotlib.use("TkAgg")
 
-file_path = 'data/20231220.xlsx'
+file_path = 'data/20231223.xlsx'
 df = pd.read_excel(file_path)
 df = df[df['Current Price'] >= 0]
 df['Sector'] = df['Sector'].str.replace('/', ',')
