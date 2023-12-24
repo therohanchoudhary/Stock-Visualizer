@@ -17,6 +17,7 @@ df = df[df['Current Price'] >= 0]
 df['Sector'] = df['Sector'].str.replace('/', ',')
 df['Sector'] = df['Sector'].str.rstrip()
 df.drop(columns=['EPS Ratio'], inplace=True)
+sector_df = None
 
 df.drop([
     'Strengths', 'Limitations', "Today's High", "Today's Low",
@@ -47,6 +48,10 @@ threshold_ratios = {
     'ss_rating_1': [3.5, 1],
     'piotroski': [7, 3],
 }
+
+
+def round_agg_df_col(x):
+    return round(x.mean(), 2)
 
 
 def format_text_box(row, column_name, threshold=0):
@@ -114,11 +119,13 @@ def format_df(data):
     return data
 
 
+recommend_df = format_df(df)
+
+
 @app.route('/recommendation')
 def stock_recommendation_selector():
-    data = format_df(df)
     return render_template('stock_recommendation.html',
-                           table=data.to_html(
+                           table=recommend_df.to_html(
                                classes='table table-striped', index=False, escape=False, table_id='dataTable'),
                            )
 
@@ -151,50 +158,22 @@ def stock_recommendation(stock_name):
 
 @app.route('/sector')
 def sector():
-    average_price_changes = df.groupby('Sector')['Price Change %'].mean().reset_index()
-    average_market_cap = df.groupby('Sector')['Market Cap'].mean().reset_index()
-    num_stocks_per_sector = df['Sector'].value_counts().reset_index()
+    global sector_df
 
-    average_roe = df.groupby('Sector')['ROE'].mean().reset_index()
-    average_pe = df.groupby('Sector')['PE Ratio'].mean().reset_index()
-    average_piotroski = df.groupby('Sector')['Piotroski'].mean().reset_index()
-    average_de = df.groupby('Sector')['Debt to Equity'].mean().reset_index()
-    average_pb = df.groupby('Sector')['PB Ratio'].mean().reset_index()
-    average_analysts_rating = df.groupby('Sector')['Analysts Rating'].mean().reset_index()
-    average_ss_rating_1 = df.groupby('Sector')['SS rating 1'].mean().reset_index()
+    if sector_df is None:
+        agg_funcs = {}
+        for col in ['Price Change %', 'Analysts Rating', 'Market Cap', 'ROE', 'Piotroski', 'Debt to Equity',
+                    'PE Ratio', 'PB Ratio', 'SS rating 1']:
+            agg_funcs[col] = round_agg_df_col
 
-    average_price_changes['Price Change %'] = average_price_changes['Price Change %'].round(2)
-    average_market_cap['Market Cap in Crores'] = average_market_cap['Market Cap'].round(2)
-    num_stocks_per_sector.columns = ['Sector', 'Number of Stocks']
-    average_roe['ROE'] = average_roe['ROE'].round(2)
-    average_pe['PE Ratio'] = average_pe['PE Ratio'].round(2)
-    average_piotroski['Piotroski'] = average_piotroski['Piotroski'].round(2)
-    average_de['Debt to Equity'] = average_de['Debt to Equity'].round(2)
-    average_pb['PB Ratio'] = average_pb['PB Ratio'].round(2)
-    average_analysts_rating['Analysts Rating'] = average_analysts_rating['Analysts Rating'].round(2)
-    average_ss_rating_1['SS rating 1'] = average_ss_rating_1['SS rating 1'].round(2)
-
-    dataframes_to_merge = [
-        average_price_changes,
-        average_market_cap,
-        num_stocks_per_sector,
-        average_roe,
-        average_pe,
-        average_piotroski,
-        average_de,
-        average_pb,
-        average_analysts_rating,
-        average_ss_rating_1,
-    ]
-
-    result_df = dataframes_to_merge[0]
-    for df_to_merge in dataframes_to_merge[1:]:
-        result_df = pd.merge(result_df, df_to_merge, on='Sector')
-
-    result_df = format_df(result_df)
+        df_by_sector = df.groupby('Sector').agg(agg_funcs).reset_index()
+        num_stocks_per_sector = df['Sector'].value_counts().reset_index()
+        num_stocks_per_sector.columns = ['Sector', 'Number of Stocks']
+        sector_df = format_df(pd.merge(df_by_sector, num_stocks_per_sector, on='Sector'))
 
     return render_template('sector.html',
-                           table=result_df[['Sector', 'Price Change %', 'Market Cap in Crores', 'Number of Stocks',
+                           table=sector_df[['Sector', 'Price Change %', 'Market Cap',
+                                            'Number of Stocks',
                                             'ROE', 'PE Ratio', 'Piotroski', 'Debt to Equity', 'PB Ratio',
                                             'Analysts Rating', 'SS rating 1']].to_html(
                                classes='table table-striped', index=False, escape=False, table_id='dataTable'))
